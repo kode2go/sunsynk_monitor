@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Sunsynk Energy Flow Monitor</title>
+</head>
+<body style="font-family:Arial; padding:20px; max-width:700px; margin:auto;">
+
+  <h1>🔆 Sunsynk Energy Flow Monitor</h1>
+
+  <p>This page runs <b>only locally</b> and <b>does not send your info anywhere else</b>.</p>
+
+  <label>Email:</label><br>
+  <input type="text" id="email" style="width:100%; padding:8px;"><br><br>
+
+  <label>Password:</label><br>
+  <input type="password" id="password" style="width:100%; padding:8px;"><br><br>
+
+  <label>Plant ID:</label><br>
+  <input type="text" id="plant_id" style="width:100%; padding:8px;"><br><br>
+
+  <button onclick="fetchEnergyFlow()" style="padding:10px 20px; font-size:16px;">🔋 Fetch Energy Flow</button>
+
+  <h2>Result:</h2>
+  
+  <!-- Multiline Textarea -->
+  <textarea id="result" rows="10" style="width:100%; padding:10px; font-size:14px; background:#eee; border-radius:5px;" readonly></textarea>
+  
+  <br><br>
+
+  <script>
+    async function fetchEnergyFlow() {
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value.trim();
+      const plant_id = document.getElementById('plant_id').value.trim();
+
+      if (!email || !password || !plant_id) {
+        alert("❗ Please enter Email, Password, and Plant ID.");
+        return;
+      }
+
+      const loginurl = "https://api.sunsynk.net/oauth/token";
+      const payload = {
+        username: email,
+        password: password,
+        grant_type: "password"
+      };
+
+      try {
+        // Step 1: Get Bearer Token
+        const tokenResponse = await fetch(loginurl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        const tokenData = await tokenResponse.json();
+        console.log('Token response:', tokenData);
+
+        if (!tokenResponse.ok || !tokenData.data || !tokenData.data.access_token) {
+          document.getElementById('result').value = "Error: Unable to get Bearer Token.";
+          return;
+        }
+
+        const bearer_token = tokenData.data.access_token;
+
+        // Step 2: Fetch Energy Flow Data
+        const energyFlowUrl = `https://api.sunsynk.net/api/v1/plant/energy/${plant_id}/flow`;
+
+        const energyResponse = await fetch(energyFlowUrl, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'Authorization': `Bearer ${bearer_token}`
+          }
+        });
+
+        const energyData = await energyResponse.json();
+        console.log('Energy response:', energyData);
+
+        if (energyResponse.ok && energyData.data) {
+          const soc = energyData.data.soc ?? 'N/A';
+          const pvPower = energyData.data.pvPower ?? 'N/A';
+          const battPower = energyData.data.battPower ?? 'N/A';
+          const gridPower = energyData.data.gridOrMeterPower ?? 'N/A';
+          const loadPower = energyData.data.loadOrEpsPower ?? 'N/A';
+
+          const output = `
+****************************************************
+Your battery State of Charge (SOC) is: ${soc}%
+PV Power: ${pvPower} W
+Battery Power: ${battPower} W
+Grid or Meter Power: ${gridPower} W
+Load or EPS Power: ${loadPower} W
+****************************************************
+          `.trim();
+
+          document.getElementById('result').value = output;
+        } else {
+          document.getElementById('result').value = "Error: Unable to fetch energy data.";
+        }
+
+      } catch (error) {
+        document.getElementById('result').value = "Error: " + error.message;
+      }
+    }
+  </script>
+
+</body>
+</html>
